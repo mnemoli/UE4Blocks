@@ -36,23 +36,28 @@ public:
 	virtual void TickComponent( float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction ) override;
 
 	//Raycast in direction from origin. Direction must contain length.
-	UFUNCTION(BlueprintCallable, Category = "Voxel Terrain") virtual bool Raycast(FVector Origin, FVector Direction, FVector& VoxelLocation) {
+	virtual bool Raycast(FVector Origin, FVector Direction, FVector& VoxelLocation) {
 		return false;
 	};
 
 	//Raycast in direction from origin and return the voxel before the hit voxel. Direction must contain length.
-	UFUNCTION(BlueprintCallable, Category = "Voxel Terrain") virtual bool RaycastPrevious(FVector Origin, FVector Direction, FVector& VoxelLocation) {
+	virtual bool RaycastPrevious(FVector Origin, FVector Direction, FVector& VoxelLocation) {
 		return false;
 	};
 
 	//Add block at the given vector (in world coordinates)
-	UFUNCTION(BlueprintCallable, Category = "Voxel Terrain") virtual bool AddBlock(FVector BlockPosition, uint8 Material) {
+	virtual bool AddBlock(FVector BlockPosition, uint8 Material) {
 		return false;
 	};
 
 	//Remove block from the given vector (in world coordinates)
-	UFUNCTION(BlueprintCallable, Category = "Voxel Terrain") virtual bool RemoveBlock(FVector BlockPosition) {
+	virtual bool RemoveBlock(FVector BlockPosition) {
 		return false;
+	};
+
+	//Find the material of the block at the given vector (in world coordinates)
+	virtual int32 GetBlockMaterial(FVector BlockPosition) {
+		return 0;
 	};
 
 	virtual FDecodedMesh* ExtractMesh(FVector Origin) { return nullptr; };

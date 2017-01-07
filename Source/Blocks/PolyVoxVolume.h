@@ -35,6 +35,7 @@ public:
 	virtual bool RaycastPrevious(FVector Origin, FVector Direction, FVector& VoxelLocation) override;
 	virtual bool AddBlock(FVector BlockPosition, uint8 Material) override;
 	virtual bool RemoveBlock(FVector BlockPosition) override;
+	virtual int32 GetBlockMaterial(FVector BlockPosition) override;
 
 	virtual FVector WorldSpaceToVoxelSpace(FVector WorldSpace) override;
 	virtual FVector VoxelSpaceToWorldSpace(FVector VoxelSpace) override;

@@ -44,6 +44,11 @@ public:
 		return VoxelVolume->RemoveBlock(BlockPosition);
 	};
 
+	//Find the material of the block at the given vector (in world coordinates)
+	UFUNCTION(BlueprintCallable, Category = "Voxel Terrain") int32 GetBlockMaterial(FVector BlockPosition) {
+		return VoxelVolume->GetBlockMaterial(BlockPosition);
+	};
+
 	// The procedurally generated mesh that represents our voxels
 	UPROPERTY(Category = "Voxel Terrain", BlueprintReadWrite, VisibleAnywhere) class URuntimeMeshComponent* TerrainMesh;
 

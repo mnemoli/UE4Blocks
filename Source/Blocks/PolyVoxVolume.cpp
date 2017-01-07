@@ -190,13 +190,22 @@ bool UPolyVoxVolume::AddBlock(FVector BlockPosition, uint8 Material)
 
 bool UPolyVoxVolume::RemoveBlock(FVector BlockPosition)
 {
-	const PolyVox::Vector3DInt32 Pos(BlockPosition.X, BlockPosition.Y, BlockPosition.Z);
+	const auto VoxelSpace = WorldSpaceToVoxelSpace(BlockPosition);
+	const PolyVox::Vector3DInt32 Pos(VoxelSpace.X, VoxelSpace.Y, VoxelSpace.Z);
 	auto VoxelToChange = VoxelVolume->getVoxel(Pos);
 	VoxelToChange.setDensity(0);
 	VoxelToChange.setMaterial(0);
 	VoxelVolume->setVoxel(Pos, VoxelToChange);
 
-	ChunkManager->InvalidateChunk(BlockPosition);
+	ChunkManager->InvalidateChunk(VoxelSpace);
 
 	return true;
+}
+
+int32 UPolyVoxVolume::GetBlockMaterial(FVector BlockPosition)
+{
+	const auto VoxelSpace = WorldSpaceToVoxelSpace(BlockPosition);
+	const PolyVox::Vector3DInt32 Pos(VoxelSpace.X, VoxelSpace.Y, VoxelSpace.Z);
+	auto Voxel = VoxelVolume->getVoxel(Pos);
+	return Voxel.getMaterial();
 }
