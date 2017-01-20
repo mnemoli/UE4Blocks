@@ -3,11 +3,12 @@
 #pragma once
 #include "VoxelTerrainVolume.h"
 #include "PolyVox/PagedVolume.h"
-#include "PolyVox/MaterialDensityPair.h"
+#include "BlocksVoxelType.h"
 #include "VoxelChunkManager.h"
 #include "PolyVox/CubicSurfaceExtractor.h"
 #include "PolyVox/Mesh.h"
 #include "PolyVox/Picking.h"
+#include "WindowsPlatformProcess.h"
 #include "PolyVoxVolume.generated.h"
 
 /**
@@ -22,6 +23,7 @@ public:
 	~UPolyVoxVolume();
 
 	virtual FDecodedMesh* ExtractMesh(FVector Origin) override;
+	virtual TArray<FObjectVoxel> SpawnObjects(FVector Origin) override;
 
 	virtual void Test() override;
 
@@ -32,8 +34,9 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	virtual bool Raycast(FVector Origin, FVector Direction, FVector& VoxelLocation) override;
+	virtual bool RaycastBlocksOnly(FVector Origin, FVector Direction, FVector & voxelLocation) override;
 	virtual bool RaycastPrevious(FVector Origin, FVector Direction, FVector& VoxelLocation) override;
-	virtual bool AddBlock(FVector BlockPosition, uint8 Material) override;
+	virtual bool AddBlock(FVector BlockPosition, uint8 Material, uint8 DataBits) override;
 	virtual bool RemoveBlock(FVector BlockPosition) override;
 	virtual int32 GetBlockMaterial(FVector BlockPosition) override;
 
@@ -69,14 +72,16 @@ public:
 	UPROPERTY(Category = "Voxel Terrain", BlueprintReadWrite, EditAnywhere) float CollisionSurrounds;
 
 private:
-	TSharedPtr<PolyVox::PagedVolume<PolyVox::MaterialDensityPair44>> VoxelVolume;
+	TSharedPtr<PolyVox::PagedVolume<CurBlocksVoxelType>> VoxelVolume;
 
-	UPROPERTY()
+	UPROPERTY(Instanced)
 		UVoxelChunkManager* ChunkManager;
 
 	FCriticalSection CriticalSection;
 
 	PolyVox::PickResult RaycastInternal(FVector Origin, FVector Direction);
+
+	PolyVox::Region findRegionfromOrigin(FVector Origin);
 };
 
 // Bridge between PolyVox Vector3DFloat and Unreal Engine 4 FVector

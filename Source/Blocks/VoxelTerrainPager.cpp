@@ -4,17 +4,18 @@
 #include "VoxelTerrainPager.h"
 using namespace PolyVox;
 #include "VM/kernel.h"
+#include "Archive.h"
 using namespace anl;
 
 VoxelTerrainPager::VoxelTerrainPager(uint32 NoiseSeed, uint32 Octaves, float Frequency, float Scale, float Offset, float Height)
-	: PagedVolume<MaterialDensityPair44>::Pager(), Seed(NoiseSeed), NoiseOctaves(Octaves), NoiseFrequency(Frequency), NoiseScale(Scale), NoiseOffset(Offset), TerrainHeight(Height)
+	: PagedVolume<CurBlocksVoxelType>::Pager(), Seed(NoiseSeed), NoiseOctaves(Octaves), NoiseFrequency(Frequency), NoiseScale(Scale), NoiseOffset(Offset), TerrainHeight(Height)
 {
 
 }
 
 // Called when a new chunk is paged in
 // This function will automatically generate our voxel-based terrain from simplex noise
-void VoxelTerrainPager::pageIn(const PolyVox::Region& region, PagedVolume<MaterialDensityPair44>::Chunk* Chunk)
+void VoxelTerrainPager::pageIn(const PolyVox::Region& region, PagedVolume<CurBlocksVoxelType>::Chunk* Chunk)
 {
 	auto RegionCentre = region.getCentre();
 	FString RegionString;
@@ -33,11 +34,20 @@ void VoxelTerrainPager::pageIn(const PolyVox::Region& region, PagedVolume<Materi
 
 	FString AbsoluteFilePath = SaveDirectory + "/" + HashedRegionString;
 
-	TArray<uint8> VoxelArray;
+	TArray<uint8> CompressedVoxelArray;
+	FBufferArchive VoxelArray;
 
 	if (PlatformFile.FileExists(*AbsoluteFilePath))
 	{
-		FFileHelper::LoadFileToArray(VoxelArray, *AbsoluteFilePath);
+		FFileHelper::LoadFileToArray(CompressedVoxelArray, *AbsoluteFilePath);
+		FArchiveLoadCompressedProxy Decompressor = FArchiveLoadCompressedProxy(CompressedVoxelArray, ECompressionFlags::COMPRESS_ZLIB);
+		if (Decompressor.GetError())
+		{
+			UE_LOG(LogTemp, Error, TEXT("Shit"));
+		}
+		Decompressor.Flush();
+		Decompressor << VoxelArray;
+		VoxelArray.Seek(0);
 		int i = 0;
 
 		auto It = VoxelArray.CreateConstIterator();
@@ -47,15 +57,14 @@ void VoxelTerrainPager::pageIn(const PolyVox::Region& region, PagedVolume<Materi
 			for (int y = region.getLowerY(); y <= region.getUpperY(); y++)
 			{
 				for (int z = region.getLowerZ(); z <= region.getUpperZ(); z++) {
-					MaterialDensityPair44 Voxel;
+					CurBlocksVoxelType Voxel;
 					Voxel.setMaterial(*It);
 					It++;
 					auto density = *It;
-					if (density == 0)
-					{
-						density = 255;
-					}
 					Voxel.setDensity(density);
+					It++;
+					auto data = *It;
+					Voxel.setData(data);
 					It++;
 					Chunk->setVoxel(x - region.getLowerX(), y - region.getLowerY(), z - region.getLowerZ(), Voxel);
 					
@@ -104,7 +113,7 @@ void VoxelTerrainPager::pageIn(const PolyVox::Region& region, PagedVolume<Materi
 				for (int z = region.getLowerZ(); z <= region.getUpperZ(); z++) { // Evaluate the noise
 
 					auto EvaluatedNoise = TerrainExecutor.evaluateScalar(x, y, z, PerturbGradient);
-					MaterialDensityPair44 Voxel;
+					CurBlocksVoxelType Voxel;
 					bool bSolid = EvaluatedNoise > 0.5;
 
 					Voxel.setDensity(bSolid ? 255 : 0);
@@ -123,7 +132,7 @@ void VoxelTerrainPager::pageIn(const PolyVox::Region& region, PagedVolume<Materi
 }
 
 // Called when a chunk is paged out
-void VoxelTerrainPager::pageOut(const PolyVox::Region& region, PagedVolume<MaterialDensityPair44>::Chunk* Chunk)
+void VoxelTerrainPager::pageOut(const PolyVox::Region& region, PagedVolume<CurBlocksVoxelType>::Chunk* Chunk)
 {
 	auto RegionCentre = region.getCentre();
 	FString RegionString;
@@ -145,7 +154,7 @@ void VoxelTerrainPager::pageOut(const PolyVox::Region& region, PagedVolume<Mater
 		
 		FString AbsoluteFilePath = SaveDirectory + "/" + HashedRegionString;
 
-		FString RegionData;
+		/*FString RegionData;
 		// write basic region data to file
 		for (int x = region.getLowerX(); x <= region.getUpperX(); x++)
 		{
@@ -165,5 +174,26 @@ void VoxelTerrainPager::pageOut(const PolyVox::Region& region, PagedVolume<Mater
 		}
 
 		FFileHelper::SaveStringToFile(RegionData, *AbsoluteFilePath);
+		*/
+
+		FBufferArchive BinaryRegionData;
+		CurBlocksVoxelType LastVoxel;
+		for (int x = region.getLowerX(); x <= region.getUpperX(); x++)
+		{
+			for (int y = region.getLowerY(); y <= region.getUpperY(); y++)
+			{
+				for (int z = region.getLowerZ(); z <= region.getUpperZ(); z++) {
+					auto Voxel = Chunk->getVoxel(x - region.getLowerX(), y - region.getLowerY(), z - region.getLowerZ());
+					BinaryRegionData.Add(Voxel.getMaterial());
+					BinaryRegionData.Add(Voxel.getDensity());
+					BinaryRegionData.Add(Voxel.getData());
+				}
+			}
+		}
+		TArray<uint8> CompressedData;
+		FArchiveSaveCompressedProxy Compressor = FArchiveSaveCompressedProxy(CompressedData, ECompressionFlags::COMPRESS_ZLIB);
+		Compressor << BinaryRegionData;
+		Compressor.Flush();
+		FFileHelper::SaveArrayToFile(CompressedData, *AbsoluteFilePath);
 	}
 }

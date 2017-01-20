@@ -3,6 +3,8 @@
 #include "Blocks.h"
 #include "PolyVoxVolume.h"
 #include "VoxelTerrainPager.h"
+#include "ClassMapping.h"
+#include "PolyVox/Raycast.h"
 
 UPolyVoxVolume::UPolyVoxVolume()
 {
@@ -16,7 +18,7 @@ UPolyVoxVolume::UPolyVoxVolume()
 	ChunkSize = 128;
 	BlockSize = 100;
 
-	VoxelVolume = MakeShareable(new PolyVox::PagedVolume<PolyVox::MaterialDensityPair44>(new VoxelTerrainPager(Seed, NoiseOctaves, NoiseFrequency, NoiseScale, NoiseOffset, TerrainHeight)));
+	VoxelVolume = MakeShareable(new PolyVox::PagedVolume<CurBlocksVoxelType>(new VoxelTerrainPager(Seed, NoiseOctaves, NoiseFrequency, NoiseScale, NoiseOffset, TerrainHeight)));
 	ChunkManager = CreateDefaultSubobject<UVoxelChunkManager>(TEXT("Chunk Manager"));
 
 	PrimaryComponentTick.bCanEverTick = true;
@@ -53,16 +55,22 @@ FVector UPolyVoxVolume::GetVoxelChunkLocationFromVoxelSpace(FVector VoxelSpace)
 	return (FlooredVector * ChunkSize);
 }
 
-FDecodedMesh* UPolyVoxVolume::ExtractMesh(FVector Origin)
+PolyVox::Region UPolyVoxVolume::findRegionfromOrigin(FVector Origin)
 {
-	FDecodedMesh* Mesh = new FDecodedMesh();
-	//Convert into voxelspace (i.e. divide by BlockSize). Should go perfectly since origin should be a multiple of the blocksize
 	FVector InVoxelSpace = WorldSpaceToVoxelSpace(Origin);
 
 	PolyVox::Vector3DInt32 o = PolyVox::Vector3DInt32(InVoxelSpace.X, InVoxelSpace.Y, InVoxelSpace.Z);
 	PolyVox::Vector3DInt32 t = PolyVox::Vector3DInt32(InVoxelSpace.X + ChunkSize - 1, InVoxelSpace.Y + ChunkSize - 1, TerrainHeight);
 
-	PolyVox::Region ToExtract(o, t);
+	return PolyVox::Region(o, t);
+}
+
+FDecodedMesh* UPolyVoxVolume::ExtractMesh(FVector Origin)
+{
+	FDecodedMesh* Mesh = new FDecodedMesh();
+
+	PolyVox::Region ToExtract = findRegionfromOrigin(Origin);
+
 	CriticalSection.Lock();
 	auto ExtractedMesh = extractCubicMesh(VoxelVolume.Get(),  ToExtract);
 	CriticalSection.Unlock();
@@ -114,6 +122,47 @@ FDecodedMesh* UPolyVoxVolume::ExtractMesh(FVector Origin)
 	return Mesh;
 }
 
+TArray<FObjectVoxel> UPolyVoxVolume::SpawnObjects(FVector Origin)
+{
+	//for now naively spawn all objects regardless of whether they are visible
+
+	TArray<FObjectVoxel> TheArray;
+
+	PolyVox::Region ToExtract = findRegionfromOrigin(Origin);
+
+	for (auto x = ToExtract.getLowerX(); x < ToExtract.getUpperX(); x++)
+	{
+		for (auto y = ToExtract.getLowerY(); y < ToExtract.getUpperY(); y++)
+		{
+			for (auto z = ToExtract.getLowerZ(); z < ToExtract.getUpperZ(); z++)
+			{
+				//if the current voxel maps up to a class, then spawn it
+
+				auto Voxel = VoxelVolume->getVoxel(x, y, z);
+				TSubclassOf<AVoxelObject> Subclass;
+				if (Voxel.getMaterial() == 0 || Voxel.getMaterial() == 1)
+				{
+					continue;
+				}
+				else {
+					bool FoundClass = ClassMapping::GetClassFromMaterial(Voxel.getMaterial(), Subclass);
+					if (FoundClass)
+					{
+						FObjectVoxel ObjVox;
+						ObjVox.WorldLocation = VoxelSpaceToWorldSpace(FVector(x,y,z));
+						ObjVox.Class = Subclass;
+						ObjVox.Data = Voxel.getData();
+						TheArray.Add(ObjVox);
+					}
+				}
+				
+			}
+		}
+	}
+
+	return TheArray;
+}
+
 void UPolyVoxVolume::Test()
 {
 	ChunkManager->SetupTest();
@@ -128,24 +177,45 @@ void UPolyVoxVolume::BeginPlay()
 void UPolyVoxVolume::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	ChunkManager->Tick(DeltaTime);
+	ChunkManager->TickChunks(DeltaTime);
 }
 
 bool UPolyVoxVolume::Raycast(FVector Origin, FVector Direction, FVector& VoxelLocation)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Trying to do a raycast"));
 	PolyVox::PickResult Result = RaycastInternal(Origin, Direction);
 	if (Result.didHit)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Hit summat"));
 		VoxelLocation = FVector(Result.hitVoxel.getX(), Result.hitVoxel.getY(), Result.hitVoxel.getZ());
 		return true;
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Didn't hit anything"));
 		return false;
 	}
+}
+
+bool UPolyVoxVolume::RaycastBlocksOnly(FVector Origin, FVector Direction, FVector& voxelLocation)
+{
+	const FVector OriginVoxelSpace = WorldSpaceToVoxelSpace(Origin);
+	const FVector DirectionVoxelSpace = WorldSpaceToVoxelSpace(Direction);
+	const PolyVox::Vector3DFloat O = PolyVox::Vector3DFloat(OriginVoxelSpace.X, OriginVoxelSpace.Y, OriginVoxelSpace.Z);
+	const PolyVox::Vector3DFloat D = PolyVox::Vector3DFloat(DirectionVoxelSpace.X, DirectionVoxelSpace.Y, DirectionVoxelSpace.Z);
+	PolyVox::RaycastResult Result;
+	auto x = BlocksRaycastPickingFunctor<PolyVox::PagedVolume<CurBlocksVoxelType>>();
+	Result = PolyVox::raycastWithDirection(VoxelVolume.Get(), O, D, x);
+
+	if (x.m_result.didHit)
+	{
+		auto VoxelLoc = x.m_result.hitVoxel;
+		voxelLocation = FVector(VoxelLoc.getX(), VoxelLoc.getY(), VoxelLoc.getZ());
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+
+
 }
 
 bool UPolyVoxVolume::RaycastPrevious(FVector Origin, FVector Direction, FVector& VoxelLocation)
@@ -165,22 +235,32 @@ bool UPolyVoxVolume::RaycastPrevious(FVector Origin, FVector Direction, FVector&
 
 PolyVox::PickResult UPolyVoxVolume::RaycastInternal(FVector Origin, FVector Direction)
 {
-	const PolyVox::MaterialDensityPair44 EmptyVoxel = PolyVox::MaterialDensityPair44(0, 0);
+	const CurBlocksVoxelType EmptyVoxel = CurBlocksVoxelType(0, 0, 0);
 	const FVector OriginVoxelSpace = WorldSpaceToVoxelSpace(Origin);
 	const FVector DirectionVoxelSpace = WorldSpaceToVoxelSpace(Direction);
 	const PolyVox::Vector3DFloat O = PolyVox::Vector3DFloat(OriginVoxelSpace.X, OriginVoxelSpace.Y, OriginVoxelSpace.Z);
 	const PolyVox::Vector3DFloat D = PolyVox::Vector3DFloat(DirectionVoxelSpace.X, DirectionVoxelSpace.Y, DirectionVoxelSpace.Z);
+	
 	PolyVox::PickResult Result = PolyVox::pickVoxel(VoxelVolume.Get(), O, D, EmptyVoxel);
 
 	return Result;
 }
 
-bool UPolyVoxVolume::AddBlock(FVector BlockPosition, uint8 Material)
+bool UPolyVoxVolume::AddBlock(FVector BlockPosition, uint8 Material, uint8 DataBits)
 {
 	const PolyVox::Vector3DInt32 Pos(BlockPosition.X, BlockPosition.Y, BlockPosition.Z);
-	auto VoxelToChange = VoxelVolume->getVoxel(Pos);
-	VoxelToChange.setDensity(1);
+	CurBlocksVoxelType VoxelToChange;
+	TSubclassOf<AVoxelObject> Class;
+	if (ClassMapping::GetClassFromMaterial(Material, Class))
+	{
+		VoxelToChange.setDensity(0);
+	}
+	else
+	{
+		VoxelToChange.setDensity(1);
+	}
 	VoxelToChange.setMaterial(Material);
+	VoxelToChange.setData(DataBits);
 	VoxelVolume->setVoxel(Pos, VoxelToChange);
 
 	ChunkManager->InvalidateChunk(BlockPosition);

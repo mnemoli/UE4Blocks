@@ -38,6 +38,7 @@
 *.opensdf
 *.sdf
 *.VC.opendb
+*.VC.db
 
 # Precompiled Assets
 SourceArt/**/*.png
@@ -60,3 +61,16 @@ Intermediate/*
 
 # Cache files for the editor to use
 DerivedDataCache/*
+
+#Saved chunk caches
+Chunks/*
+
+#Third party code
+ThirdParty/**
+
+#Backups of old code
+backup/**
+
+#Config files
+Config/**
+!Config/MaterialConfig.json

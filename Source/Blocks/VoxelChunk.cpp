@@ -2,6 +2,7 @@
 
 #include "Blocks.h"
 #include "VoxelChunk.h"
+#include "VoxelObject.h"
 #include "PolyVox/PagedVolume.h"
 
 void UVoxelChunk::ExtractMesh(UVoxelTerrainVolume* VoxelVolume)
@@ -52,6 +53,34 @@ void UVoxelChunk::GenerateMeshCollision(URuntimeMeshComponent* TerrainMesh)
 	ChunkState = EChunkState::HasCollision;
 }
 
+void UVoxelChunk::SpawnObjects(UVoxelTerrainVolume* VoxelVolume)
+{
+	TArray<FObjectVoxel> ObjectsToSpawn = VoxelVolume->SpawnObjects(Origin);
+	for (auto Obj : ObjectsToSpawn)
+	{
+		auto World = GetTypedOuter<AActor>()->GetWorld();
+		FCollisionObjectQueryParams ObjectParams;
+		ObjectParams.AddObjectTypesToQuery(ECollisionChannel::ECC_GameTraceChannel4); // BObj
+		bool ObjectExists = World->SweepTestByObjectType(
+			Obj.WorldLocation
+			, Obj.WorldLocation + 1
+			, FQuat()
+			, ObjectParams
+			, FCollisionShape::MakeBox(FVector(50.f, 50.f, 50.f))
+		);
+		if (!ObjectExists)
+		{
+			FTransform Transform(Obj.WorldLocation);
+			AVoxelObject* Spawned = World->SpawnActorDeferred<AVoxelObject>(*Obj.Class, Transform);
+			Spawned->InitData(Obj.Data);
+			Spawned->FinishSpawning(Transform);
+		}
+		
+	}
+	ChunkState = EChunkState::ObjectsSpawned;
+	
+}
+
 bool UVoxelChunk::IsReadyToRender()
 {
 	return ChunkState == EChunkState::Generated;
@@ -75,4 +104,9 @@ bool UVoxelChunk::CheckNeedsToRender()
 bool UVoxelChunk::CheckNeedsCollision()
 {
 	return ChunkState == EChunkState::Rendered;
+}
+
+bool UVoxelChunk::CheckNeedsObjects()
+{
+	return ChunkState > EChunkState::Rendered && ChunkState != EChunkState::ObjectsSpawned;
 }

@@ -127,6 +127,10 @@ void UVoxelChunkManager::UpdateChunks(FVector PlayerPos)
 		{
 			Chunk.Value->GenerateMeshCollision(Outer->TerrainMesh);
 		}
+		else if (Chunk.Value->CheckNeedsObjects())
+		{
+			Chunk.Value->SpawnObjects(Volume);
+		}
 	}
 
 	// Check for new chunks which need to be loaded in
@@ -151,7 +155,7 @@ void UVoxelChunkManager::UpdateChunks(FVector PlayerPos)
 				if (HasFreeMeshSection) {
 					MeshSectionQueue[Section] = true;
 					UE_LOG(LogTemp, Warning, TEXT("Loading chunk %s into %d"), *ChunkToLoadOrigin.ToString(), Section);
-					UVoxelChunk* theChunk = NewObject<UVoxelChunk>();
+					UVoxelChunk* theChunk = NewObject<UVoxelChunk>(Outer);
 					theChunk->Initialize(ChunkToLoadOrigin, Section);
 					ChunkMap.Emplace(ChunkToLoadOrigin.ToString(), theChunk);
 				}
@@ -211,16 +215,21 @@ void UVoxelChunkManager::LoadChunks()
 	}
 }
 
-void UVoxelChunkManager::Tick(float DeltaTime)
+void UVoxelChunkManager::TickChunks(float DeltaTime)
 {
-	AVoxelTerrainActor* Outer = GetTypedOuter<AVoxelTerrainActor>();
+	AActor* Outer = GetTypedOuter<AActor>();
 
 	// Update the chunks before rendering
-	UWorld *World = GetTypedOuter<AVoxelTerrainActor>()->GetWorld();
-	ACharacter* Player = UGameplayStatics::GetPlayerCharacter(World, 0);
-	if (Player)
+	UWorld *World = Outer->GetWorld();
+
+	if(World)
 	{
-		FVector PlayerPos = Player->GetActorLocation();
-		UpdateChunks(PlayerPos);
+		ACharacter* Player = UGameplayStatics::GetPlayerCharacter(World, 0);
+		if (Player)
+		{
+			FVector PlayerPos = Player->GetActorLocation();
+			UpdateChunks(PlayerPos);
+		}
 	}
+	
 }

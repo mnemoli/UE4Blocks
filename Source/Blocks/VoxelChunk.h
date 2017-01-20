@@ -18,7 +18,8 @@ enum class EChunkState : uint8
 	Generating UMETA(DisplayName = "Generating"),
 	Generated UMETA(DisplayName = "Generated"),
 	Rendered UMETA(DisplayName = "Rendered"),
-	HasCollision UMETA(DisplayName = "Colliding")
+	HasCollision UMETA(DisplayName = "Colliding"),
+	ObjectsSpawned UMETA(DisplayName = "Objects Spawned")
 };
 
 UCLASS()
@@ -32,10 +33,12 @@ public:
 	void GenerateMeshCollision(URuntimeMeshComponent* TerrainMesh);
 	void Initialize(FVector InOrigin, uint32 InMeshSection) { Origin = InOrigin; MeshSection = InMeshSection; }
 	void Invalidate() { ChunkState = EChunkState::Uninitted; UrgentUpdate = true; }
+	void SpawnObjects(UVoxelTerrainVolume* VoxelVolume);
 	bool IsReadyToRender();
 	void SetRendering();
 	bool CheckNeedsToRender();
 	bool CheckNeedsCollision();
+	bool CheckNeedsObjects();
 	uint8 GetMeshSection();
 	UPROPERTY() bool UrgentUpdate;
 private:

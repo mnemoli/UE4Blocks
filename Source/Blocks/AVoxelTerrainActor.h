@@ -29,14 +29,19 @@ public:
 		return VoxelVolume->Raycast(Origin, Direction, VoxelLocation);
 	};
 
+	//Raycast in direction from origin. Direction must contain length.
+	UFUNCTION(BlueprintCallable, Category = "Voxel Terrain") bool RaycastBlockOnly(FVector Origin, FVector Direction, FVector& VoxelLocation) {
+		return VoxelVolume->RaycastBlocksOnly(Origin, Direction, VoxelLocation);
+	};
+
 	//Raycast in direction from origin and return the voxel before the hit voxel. Direction must contain length.
 	UFUNCTION(BlueprintCallable, Category = "Voxel Terrain") bool RaycastPrevious(FVector Origin, FVector Direction, FVector& VoxelLocation) {
 		return VoxelVolume->RaycastPrevious(Origin, Direction, VoxelLocation);
 	};
 
 	//Add block at the given vector (in world coordinates)
-	UFUNCTION(BlueprintCallable, Category = "Voxel Terrain") bool AddBlock(FVector BlockPosition, uint8 Material) {
-		return VoxelVolume->AddBlock(BlockPosition, Material);
+	UFUNCTION(BlueprintCallable, Category = "Voxel Terrain") bool AddBlock(FVector BlockPosition, uint8 Material, uint8 DataBits) {
+		return VoxelVolume->AddBlock(BlockPosition, Material, DataBits);
 	};
 
 	//Remove block from the given vector (in world coordinates)

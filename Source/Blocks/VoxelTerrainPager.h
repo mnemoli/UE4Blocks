@@ -3,11 +3,11 @@
 #pragma once
 // Polyvox Includes
 #include "PolyVox/PagedVolume.h"
-#include "PolyVox/MaterialDensityPair.h"
+#include "BlocksVoxelType.h"
 /**
  * 
  */
-class VoxelTerrainPager : public PolyVox::PagedVolume<PolyVox::MaterialDensityPair44>::Pager
+class VoxelTerrainPager : public PolyVox::PagedVolume<CurBlocksVoxelType>::Pager
 {
 public:
 	// Constructor
@@ -17,8 +17,8 @@ public:
 	virtual ~VoxelTerrainPager() {};
 
 	// PagedVolume::Pager functions
-	virtual void pageIn(const PolyVox::Region& region, PolyVox::PagedVolume<PolyVox::MaterialDensityPair44>::Chunk* pChunk);
-	virtual void pageOut(const PolyVox::Region& region, PolyVox::PagedVolume<PolyVox::MaterialDensityPair44>::Chunk* pChunk);
+	virtual void pageIn(const PolyVox::Region& region, PolyVox::PagedVolume<CurBlocksVoxelType>::Chunk* pChunk);
+	virtual void pageOut(const PolyVox::Region& region, PolyVox::PagedVolume<CurBlocksVoxelType>::Chunk* pChunk);
 
 private:
 	// Some variables to control our terrain generator

@@ -2,8 +2,6 @@
 
 #include "Blocks.h"
 #include "AVoxelTerrainActor.h"
-// PolyVox
-using namespace PolyVox;
 
 // ANL
 #include "VM/kernel.h"

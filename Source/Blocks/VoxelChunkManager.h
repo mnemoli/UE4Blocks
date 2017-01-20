@@ -17,7 +17,7 @@ class BLOCKS_API UVoxelChunkManager : public UObject
 public:
 	void UpdateChunks(FVector PlayerPos);
 	void SetupTest();
-	void Tick(float DeltaTime);
+	void TickChunks(float DeltaTime);
 	void InitalizeChunkManager();
 	void InvalidateChunk(FVector VoxelPosition);
 
